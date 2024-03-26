@@ -47,6 +47,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import lombok.NoArgsConstructor;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 @Component
 @NoArgsConstructor
@@ -60,6 +61,7 @@ public class RestHelperImpl implements RestHelper {
 	@Autowired
 	private ObjectMapper mapper;
 
+
 	@Override
 	public Supplier<Object> requestAsync(@Valid AsyncRequestDTO request) {
 		try {
@@ -71,6 +73,7 @@ public class RestHelperImpl implements RestHelper {
 			return () -> new RestServiceException("UNABLE_TO_PROCESS", e);
 		}
 	}
+
 
 	private SslContext getSslContext() throws RestServiceException {
 		try {
@@ -88,10 +91,17 @@ public class RestHelperImpl implements RestHelper {
 		RequestBodySpec uri;
 		ResponseSpec exchange;
 		RequestBodyUriSpec method;
+		SslContext context = SslContextBuilder.forClient()
+				.trustManager(InsecureTrustManagerFactory.INSTANCE)
+				.build();
+		HttpClient httpClient = HttpClient.create().secure(t -> t.sslContext(context));
 
 		if (request.getHeaders() != null) {
+//			org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder = WebClient.builder()
+//					.clientConnector(new ReactorClientHttpConnector(builder -> builder.sslContext(sslContext)))
+//					.baseUrl(request.getUri());
 			org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder = WebClient.builder()
-					.clientConnector(new ReactorClientHttpConnector(builder -> builder.sslContext(sslContext)))
+					.clientConnector(new ReactorClientHttpConnector(httpClient))
 					.baseUrl(request.getUri());
 			if (request.getHeaders().getContentType() != null) {
 				webClientBuilder = webClientBuilder.defaultHeader(HttpHeaders.CONTENT_TYPE,
@@ -100,7 +110,7 @@ public class RestHelperImpl implements RestHelper {
 			webClient = webClientBuilder.build();
 		} else {
 			webClient = WebClient.builder()
-					.clientConnector(new ReactorClientHttpConnector(builder -> builder.sslContext(sslContext)))
+					.clientConnector(new ReactorClientHttpConnector(httpClient))
 					.baseUrl(request.getUri()).build();
 		}
 
